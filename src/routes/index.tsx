@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Hammer, Boxes, ReceiptText, ClipboardList, PiggyBank, Plus, Trash2,
   Image as ImageIcon, Camera, GripVertical, CalendarClock, AlertTriangle,
   CircleDollarSign, TrendingUp, Wallet, CheckCircle2, Clock, Pencil, X,
+  Wifi, WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +15,10 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useSync } from "@/hooks/use-sync";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,19 +29,6 @@ export const Route = createFileRoute("/")({
   }),
   component: App,
 });
-
-/* ---------------- storage ---------------- */
-function useLocal<T>(key: string, initial: T) {
-  const [val, setVal] = useState<T>(() => {
-    if (typeof window === "undefined") return initial;
-    try { const raw = localStorage.getItem(key); return raw ? (JSON.parse(raw) as T) : initial; }
-    catch { return initial; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* quota */ }
-  }, [key, val]);
-  return [val, setVal] as const;
-}
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const fmt = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
@@ -131,10 +120,10 @@ function ImagePicker({ value, onChange, label = "Toca o arrastra una foto" }: { 
 /* ---------------- App ---------------- */
 function App() {
   const [tab, setTab] = useState("resumen");
-  const [investments, setInvestments] = useLocal<Investment[]>("eg.invest", []);
-  const [inventory, setInventory] = useLocal<InventoryItem[]>("eg.inv", []);
-  const [budgets, setBudgets] = useLocal<Budget[]>("eg.bud", []);
-  const [tasks, setTasks] = useLocal<Task[]>("eg.tasks", []);
+  const [investments, setInvestments, { online }] = useSync<Investment[]>("investments", []);
+  const [inventory, setInventory] = useSync<InventoryItem[]>("inventory", []);
+  const [budgets, setBudgets] = useSync<Budget[]>("budgets", []);
+  const [tasks, setTasks] = useSync<Task[]>("tasks", []);
 
   const totalInvest = investments.reduce((a, b) => a + b.amount, 0);
   const totalInventoryValue = inventory.reduce((a, b) => a + b.qty * b.cost, 0);
@@ -161,6 +150,7 @@ function App() {
             <KPI icon={<Wallet className="h-4 w-4" />} label="Inversión" value={fmt(totalInvest)} />
             <KPI icon={<CircleDollarSign className="h-4 w-4" />} label="Entregado" value={fmt(totalDelivered)} accent />
           </div>
+          <StatusBadge online={online} />
         </div>
       </header>
 
@@ -352,6 +342,18 @@ function BigStat({ title, value, icon, hint, accent, positive, alert }: { title:
 
 function EmptyHint({ text }: { text: string }) {
   return <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">{text}</div>;
+}
+
+function StatusBadge({ online }: { online: boolean }) {
+  return (
+    <div className={cn(
+      "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+      online ? "bg-success/15 text-success" : "bg-warning/20 text-warning",
+    )} title={online ? "Conectado al servidor" : "Sin conexión — usando datos locales"}>
+      {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+      {online ? "En línea" : "Sin conexión"}
+    </div>
+  );
 }
 
 /* ---------------- Inversión ---------------- */
