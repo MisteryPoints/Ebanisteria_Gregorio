@@ -7,22 +7,17 @@
   <img src="https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS v4"/>
   <img src="https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white" alt="Vite 8"/>
   <img src="https://img.shields.io/badge/Bun-000?logo=bun&logoColor=white" alt="Bun"/>
-  <img src="https://img.shields.io/badge/Hono-FF6600?logo=hono&logoColor=white" alt="Hono"/>
-  <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" alt="SQLite"/>
   <br/>
   <img src="https://img.shields.io/badge/Radix_UI-161618?logo=radixui&logoColor=white" alt="Radix UI"/>
   <img src="https://img.shields.io/badge/shadcn/ui-000?logo=shadcnui&logoColor=white" alt="shadcn/ui"/>
   <img src="https://img.shields.io/badge/Recharts-FF6C37?logo=recharts&logoColor=white" alt="Recharts"/>
   <img src="https://img.shields.io/badge/SSR_Nitro-00DC82?logo=nuxt&logoColor=white" alt="Nitro SSR"/>
-  <img src="https://img.shields.io/badge/Zod-3E67B1?logo=zod&logoColor=white" alt="Zod"/>
-  <img src="https://img.shields.io/badge/react--hook--form-EC5990?logo=reacthookform&logoColor=white" alt="React Hook Form"/>
-  <img src="https://img.shields.io/badge/Hono-FF6600?logo=hono&logoColor=white" alt="Hono"/>
-  <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" alt="SQLite"/>
+  <img src="https://img.shields.io/badge/JSON_File-000?logo=json&logoColor=white" alt="JSON Storage"/>
 </p>
 
 <p align="center">
   <strong>A tablet-first workshop management dashboard for small carpentry and cabinet-making businesses.</strong><br/>
-  Built with bleeding-edge React — syncs across all your devices via a lightweight SQLite API server.
+  Built with bleeding-edge React — syncs across all your devices via built-in server functions.
 </p>
 
 ---
@@ -31,7 +26,7 @@
 
 **Ebanistería Gregorio** is a complete single-page application (SPA) purpose-built for a real carpentry workshop. It replaces scattered paper notes, messy spreadsheets, and mental math with a clean, touch-optimized dashboard.
 
-Data syncs across all devices (tablet, phone, computer) via a lightweight **Bun + Hono + SQLite** API server. When the server is unreachable, the app gracefully degrades to localStorage — perfect for workshop environments with spotty connectivity.
+Data syncs across all devices (tablet, phone, computer) via **TanStack Start server functions** — RPC endpoints that run on the same server as the app. No separate backend to deploy, no CORS config, no extra infrastructure. When the server is unreachable, the app gracefully degrades to localStorage — perfect for workshop environments with spotty connectivity.
 
 ---
 
@@ -111,8 +106,8 @@ Data syncs across all devices (tablet, phone, computer) via a lightweight **Bun 
 | **Charts** | [Recharts](https://recharts.org) | Composable charting built on D3 |
 | **Forms** | [React Hook Form](https://react-hook-form.com) + [Zod](https://zod.dev) | Performant forms with schema-based validation |
 | **Date Handling** | [date-fns](https://date-fns.org) | Tree-shakable date utilities |
-| **API Server** | [Hono](https://hono.dev) | Ultra-fast HTTP framework for the REST API |
-| **Database** | [SQLite](https://sqlite.org) via `bun:sqlite` | Embedded, zero-config, ACID-compliant relational database |
+| **API Layer** | TanStack Start Server Functions (`createServerFn`) | Auto-generated RPC endpoints, no separate deployment |
+| **Data Persistence** | JSON file + in-memory fallback | Works on Node.js/Bun; in-memory on serverless (Cloudflare, etc.) |
 | **Notifications** | [Sonner](https://sonner.emilkowal.ski) | Lightweight toast notifications |
 | **Drag & Drop** | Native HTML5 DnD | Vanilla drag-and-drop for task reordering (zero-dependency) |
 | **Animations** | [tw-animate-css](https://github.com/innocenzi/tw-animate-css) | Tailwind-compatible animation utilities |
@@ -122,39 +117,37 @@ Data syncs across all devices (tablet, phone, computer) via a lightweight **Bun 
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                    Browser (Client)                         │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │              TanStack Start App (SPA)                 │  │
-│  │  routes/index.tsx  ←  860 lines, 5 tab-based views   │  │
-│  │  routes/__root.tsx ←  Root layout + ErrorBoundary    │  │
-│  │  components/ui/    ←  41 shadcn/ui primitives        │  │
-│  │  hooks/use-sync.ts ←  API client + localStorage      │  │
-│  │                     ←  cache layer                   │  │
-│  └───────────────────┬──────────────────────────────────┘  │
-│                      │ HTTP (fetch)                         │
-│                      ▼                                      │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │         localStorage (offline cache)                  │  │
-│  └──────────────────────────────────────────────────────┘  │
-└────────────────────┬───────────────────────────────────────┘
-                     │ REST API (JSON)
-                     ▼
-┌────────────────────────────────────────────────────────────┐
-│               Bun + Hono + SQLite Server                    │
-│  server/index.ts  ←  Hono router, REST endpoints           │
-│  server/db.ts     ←  SQLite schema + init (bun:sqlite)     │
-│  data/eg.db       ←  SQLite database file (WAL mode)       │
-│                                                             │
-│  GET  /api/:entity   → Full array of items                 │
-│  PUT  /api/:entity   ← Replace entire array (atomic tx)    │
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                     TanStack Start App                        │
+│         (SSR + Client Hydration via Nitro + Vite)             │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │              Client (browser)                          │   │
+│  │  routes/index.tsx  ←  5 tab-based views               │   │
+│  │  hooks/use-sync.ts ←  calls server functions via RPC  │   │
+│  │  localStorage      ←  offline cache layer             │   │
+│  └──────────────────────┬─────────────────────────────────┘   │
+│                         │ createServerFn RPC                  │
+│                         ▼                                     │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │              Server (Nitro SSR)                        │   │
+│  │  src/lib/sync-store.ts  ←  pullAll / pushEntity       │   │
+│  │  .data/store.json       ←  persistent JSON file        │   │
+│  │  (or in-memory on serverless platforms)                │   │
+│  └────────────────────────────────────────────────────────┘   │
+│                                                               │
+│  Data flow:                                                    │
+│    Mount → pullAll() GET  → server returns full store         │
+│    Write → pushEntity() POST → server persists + responds     │
+│    Offline → localStorage cache (degrades gracefully)         │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Decisions
 
-- **Cross-device sync via a lightweight API server**: A **Bun + Hono + SQLite** server handles all data persistence. It uses a simple GET/PUT pattern — GET fetches the full array, PUT replaces it atomically in a transaction. This avoids complex diff logic and works reliably for the workshop's data volume.
-- **localStorage as offline cache**: The `useSync` hook tries the API first; if unreachable, it falls back to localStorage. Writes are optimistic — they update localStorage immediately and sync to the API in the background. A connection indicator in the header shows sync status.
+- **Cross-device sync via TanStack Start server functions**: Uses `createServerFn` from TanStack Start — the framework automatically transforms these into RPC endpoints. No separate server, no CORS, no configuration. The handler runs server-side via Nitro; the client gets a typed fetcher.
+- **localStorage as offline cache**: The `useSync` hook calls the server function first; if unreachable, it falls back to localStorage. Writes are optimistic — they update localStorage immediately and sync to the server in the background. A connection indicator in the header shows sync status.
 - **SSR for Performance**: TanStack Start provides server-side rendering on first load for fast initial paints and SEO, then hydrates into a full SPA.
 - **Tablet-First Design**: The entire UI is built for portrait tablet use — large touch targets (`min-height: 3rem`), thumb-friendly bottom nav, 1rem font sizes. Desktop is secondary.
 - **Image Compression**: Photos taken with the device camera are resized client-side (canvas, max 1200px, 82% JPEG quality) to stay within localStorage quota and keep the SQLite database lean.
@@ -176,23 +169,11 @@ bun install
 
 ### Development
 
-Run the frontend and API server together:
-
 ```bash
-bun run dev:all
-```
-
-Or in separate terminals:
-
-```bash
-# Terminal 1 — API server (SQLite-backed, port 3001)
-bun run server
-
-# Terminal 2 — Frontend (TanStack Start, port 3000)
 bun dev
 ```
 
-The app opens at `http://localhost:3000`. The API server auto-creates `data/eg.db` on first run.
+Opens at `http://localhost:3000`. Server functions are served on the same port automatically — no separate server needed.
 
 ### Build
 
@@ -223,8 +204,9 @@ src/
 │   └── ui/              # shadcn/ui primitives (Button, Card, Dialog, etc.)
 ├── hooks/
 │   ├── use-mobile.tsx   # Mobile detection hook
-│   └── use-sync.ts      # API sync hook (replaces useLocal)
+│   └── use-sync.ts      # Sync hook (calls server functions RPC)
 ├── lib/
+│   ├── sync-store.ts        # Server functions (createServerFn)
 │   ├── error-capture.ts     # Global error event listeners
 │   ├── error-page.ts        # SSR error HTML renderer
 │   ├── error-reporting.ts   # Pluggable error reporting
@@ -237,11 +219,6 @@ src/
 ├── server.ts            # SSR entry (error-wrapped)
 ├── start.ts             # TanStack Start instance
 └── styles.css           # Tailwind v4 + custom theme
-server/
-├── index.ts             # Hono API server (GET/PUT endpoints)
-└── db.ts                # SQLite schema + init via bun:sqlite
-data/
-└── eg.db                # SQLite database (auto-created)
 ```
 
 ---
@@ -266,11 +243,11 @@ Built with **OKLCH** color space for consistent perceptual brightness.
 
 - **Real-world problem, real solution** — built for an actual operating carpentry workshop, not a toy demo
 - **Modern tech stack** — React 19 + TanStack Start + Vite 8 + Bun + Tailwind v4 (cutting-edge as of 2026)
-- **Cross-device sync** — Bun + Hono + SQLite backend keeps data consistent across phone, tablet, and computer
+- **Cross-device sync** — TanStack Start server functions keep data consistent across phone, tablet, and computer without a separate backend
 - **Graceful degradation** — Works fully offline via localStorage cache; syncs automatically when connection restores
-- **Thoughtful architecture** — SSR for performance, tablet-first UX, atomic bulk-replacement API for data consistency
+- **Thoughtful architecture** — SSR for performance, tablet-first UX, server functions for API (no CORS, single deployment)
 - **Clean codebase** — TypeScript throughout, shadcn/ui component pattern, Zod-validated forms, single-responsibility hooks
-- **Zero-infrastructure database** — SQLite requires no daemon, no configuration, just a single file
+- **Zero-infrastructure data** — JSON file persistence on Node.js/Bun; in-memory on serverless; easy to swap in any database
 - **Production-ready error handling** — SSR error pages, React Error Boundaries, global error capture, unhandled rejection handling
 
 ---

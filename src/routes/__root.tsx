@@ -78,7 +78,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Ebanistería Gregorio · Taller" },
-      { name: "description", content: "Gestiona inventario, presupuestos, inversión y tareas del taller de ebanistería." },
+      {
+        name: "description",
+        content: "Gestiona inventario, presupuestos, inversión y tareas del taller de ebanistería.",
+      },
       { name: "theme-color", content: "#3b2a1f" },
     ],
     links: [

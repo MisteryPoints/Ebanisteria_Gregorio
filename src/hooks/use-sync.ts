@@ -1,46 +1,62 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { pullAll, pushEntity } from "@/lib/sync-store";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const CACHE_PREFIX = "eg.sync.";
+const CACHE_KEY = "eg.sync.all";
 
-function readCache<T>(key: string, fallback: T): T {
+function readCache<T>(): T | null {
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as T) : null;
   } catch {
-    return fallback;
+    return null;
   }
 }
 
-function writeCache(key: string, val: unknown) {
+function writeCache(data: unknown) {
   try {
-    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(val));
-  } catch { /* quota */ }
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch {
+    /* quota */
+  }
 }
 
+type Store = {
+  investments: unknown[];
+  inventory: unknown[];
+  budgets: unknown[];
+  tasks: unknown[];
+};
+
 export function useSync<T>(
-  endpoint: string,
+  entity: keyof Store,
   initial: T,
 ): [T, Dispatch<SetStateAction<T>>, { loading: boolean; online: boolean }] {
-  const [data, setData] = useState<T>(() => readCache(endpoint, initial));
+  const [data, setData] = useState<T>(() => {
+    const cached = readCache<Store>();
+    if (cached && Array.isArray(cached[entity])) return cached[entity] as T;
+    return initial;
+  });
   const [loading, setLoading] = useState(true);
   const [online, setOnline] = useState(true);
   const mounted = useRef(true);
 
-  /* Fetch from API on mount — fall back to localStorage cache */
+  /* Pull full store from server on mount */
   useEffect(() => {
     mounted.current = true;
     setLoading(true);
 
-    fetch(`${API_BASE}/api/${endpoint}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`${res.status}`);
-        return res.json() as Promise<T>;
-      })
-      .then((apiData) => {
+    pullAll()
+      .then((store) => {
         if (!mounted.current) return;
-        setData(apiData);
-        writeCache(endpoint, apiData);
+        writeCache(store);
+        setData(store[entity] as T);
         setOnline(true);
       })
       .catch(() => {
@@ -51,26 +67,29 @@ export function useSync<T>(
         if (mounted.current) setLoading(false);
       });
 
-    return () => { mounted.current = false; };
-  }, [endpoint]);
+    return () => {
+      mounted.current = false;
+    };
+  }, [entity]);
 
-  /* Setter: optimistically update local state + cache, then PUT to API */
+  /* Setter: update local state + cache, push to server */
   const setSynced = useCallback(
     (action: SetStateAction<T>) => {
       setData((prev) => {
         const next = action instanceof Function ? action(prev) : action;
-        writeCache(endpoint, next);
 
-        fetch(`${API_BASE}/api/${endpoint}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(next),
-        }).catch(() => setOnline(false));
+        /* Update cache */
+        const cached = readCache<Store>() ?? ({} as Store);
+        cached[entity] = next as unknown[];
+        writeCache(cached);
+
+        /* Push to server (fire-and-forget) */
+        pushEntity({ data: { entity, data: next } }).catch(() => setOnline(false));
 
         return next;
       });
     },
-    [endpoint],
+    [entity],
   );
 
   return [data, setSynced, { loading, online }];
